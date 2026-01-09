@@ -1,12 +1,19 @@
 import numpy as np
-from scipy.signal import butter, filtfilt, find_peaks, resample
+from scipy.signal import butter, filtfilt, find_peaks, resample_poly
 
 
 def _moving_average(x, window_len):
     if window_len <= 1:
         return x
-    kernel = np.ones(int(window_len), dtype=float) / float(window_len)
-    return np.convolve(x, kernel, mode="same")
+    window_len = int(window_len)
+    half = window_len // 2
+    csum = np.cumsum(np.insert(x, 0, 0.0))
+    out = np.empty_like(x, dtype=float)
+    for i in range(len(x)):
+        start = max(0, i - half)
+        end = min(len(x), i + half + 1)
+        out[i] = (csum[end] - csum[start]) / float(end - start)
+    return out
 
 
 def detectIEDs(data, Fo):
@@ -32,8 +39,7 @@ def detectIEDs(data, Fo):
 
     # filtering and downsampling
     b, a = butter(4, [20 / (Fs / 2), 40 / (Fs / 2)], btype="band")
-    n_resamp = int(np.floor(n_samps / (Fo / Fs)))
-    tmpSig = resample(data, n_resamp)
+    tmpSig = resample_poly(data, int(Fs), int(Fo))
     tmpSig = tmpSig - np.mean(tmpSig)
     data2040 = filtfilt(b, a, tmpSig)
 
